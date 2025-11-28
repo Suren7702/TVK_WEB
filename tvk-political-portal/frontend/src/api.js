@@ -2,7 +2,7 @@ import axios from "axios";
 
 // 1. Dynamic Base URL
 // It checks for a deployed URL first. If not found, it defaults to localhost.
-const API_URL = import.meta.env.VITE_API_URL || "https://tvk-backend-api.azurewebsites.net/api";
+const API_URL = import.meta.env.VITE_API_URL || "/api"; // Just /api
 
 const API = axios.create({
   baseURL: API_URL,

@@ -14,27 +14,30 @@ export default function AdminLogin() {
     setError("");
 
     try {
+      // 1. Attempt login
       const { data } = await API.post("/auth/login", { email, password });
+      
+      // Destructure data for cleaner access
+      const { _id, name, email: userEmail, role, token } = data;
 
-      // data = { _id, name, email, role, token }
-      if (data.role !== "admin") {
+      // 2. Role Check
+      if (role !== "admin") {
         setError("Admin account only allowed");
         return;
       }
 
-      saveAuth(data.token, {
-        _id: data._id,
-        name: data.name,
-        email: data.email,
-        role: data.role
-      });
+      // 3. Save Auth Info (Token and User Data)
+      saveAuth(token, { _id, name, email: userEmail, role });
 
-      setAuthToken(data.token);
+      // 4. Set Authorization Header for future requests
+      setAuthToken(token);
 
-      // ✅ redirect to admin dashboard
+      // 5. Redirect to admin dashboard
       navigate("/admin/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      // 6. Handle Login Errors
+      const errorMessage = err.response?.data?.message || "Login failed";
+      setError(errorMessage);
     }
   };
 
