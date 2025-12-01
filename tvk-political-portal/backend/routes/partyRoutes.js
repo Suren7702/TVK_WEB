@@ -10,7 +10,7 @@ const router = express.Router();
 // --- POST /api/party-network/add Route Fix ---
 // The subpath is correctly set to "/add" here.
 // The route is protected by 'checkApiKey' and uses 'async' for database operations.
-router.post("/add", checkApiKey, async (req, res) => {
+router.post("/api/party-network/add", checkApiKey, async (req, res) => {
     // 1. Logic Check: Ensure request body exists
     if (!req.body || Object.keys(req.body).length === 0) {
         return res.status(400).json({ message: "Request body cannot be empty." });
