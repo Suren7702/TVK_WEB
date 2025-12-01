@@ -1,4 +1,4 @@
-// backend/controllers/partyController.js
+// controllers/partyController.js
 import PartyUnit from "../models/PartyUnit.js";
 
 /**
@@ -6,219 +6,193 @@ import PartyUnit from "../models/PartyUnit.js";
  * ensures id is a string and keeps only useful fields.
  */
 const normalizeNode = (doc = {}) => {
-  return {
-    id: String(doc._id ?? doc.id ?? ""),
-    nameTa: doc.nameTa ?? "",
-    type: doc.type ?? "",
-    parentId: doc.parentId ? String(doc.parentId) : null,
-    person: doc.person ?? "",
-    roleTa: doc.roleTa ?? "",
-    phone: doc.phone ?? "",
-    photo: doc.photo ?? ""
-  };
+    return {
+        id: String(doc._id ?? doc.id ?? ""),
+        nameTa: doc.nameTa ?? "",
+        type: doc.type ?? "",
+        parentId: doc.parentId ? String(doc.parentId) : null,
+        person: doc.person ?? "",
+        roleTa: doc.roleTa ?? "",
+        phone: doc.phone ?? "",
+        photo: doc.photo ?? ""
+    };
 };
 
 // ==========================================
 // 1. GET FULL NETWORK (Tree Structure)
 // ==========================================
 export const getPartyNetwork = async (req, res) => {
-  try {
-    // Get all units as plain objects
-    const allUnits = await PartyUnit.find({}).lean();
+    try {
+        // Get all units as plain objects
+        const allUnits = await PartyUnit.find({}).lean();
 
-    // Partition by type (defensive: normalize type to lowercase)
-    const unions = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "union");
-    const villages = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "village");
-    const wards = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "ward");
-    const booths = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "booth");
+        // Partition by type (defensive: normalize type to lowercase)
+        const unions = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "union");
+        const villages = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "village");
+        const wards = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "ward");
+        const booths = allUnits.filter((u) => String((u.type || "").toLowerCase()) === "booth");
 
-    // Build Hierarchy Tree with normalized IDs and shapes
-    const tree = unions.map((union) => {
-      const u = normalizeNode(union);
+        // Build Hierarchy Tree 
+        const tree = unions.map((union) => {
+            const u = normalizeNode(union);
 
-      const unionVillages = villages
-        .filter((v) => String(v.parentId) === String(union._id))
-        .map((village) => {
-          const v = normalizeNode(village);
+            const unionVillages = villages
+                .filter((v) => String(v.parentId) === String(union._id))
+                .map((village) => {
+                    const v = normalizeNode(village);
 
-          const villageWards = wards
-            .filter((w) => String(w.parentId) === String(village._id))
-            .map((ward) => {
-              const w = normalizeNode(ward);
+                    const villageWards = wards
+                        .filter((w) => String(w.parentId) === String(village._id))
+                        .map((ward) => {
+                            const w = normalizeNode(ward);
 
-              const wardBooths = booths
-                .filter((b) => String(b.parentId) === String(ward._id))
-                .map((b) => normalizeNode(b));
+                            const wardBooths = booths
+                                .filter((b) => String(b.parentId) === String(ward._id))
+                                .map((b) => normalizeNode(b));
 
-              return { ...w, booths: wardBooths };
-            });
+                            return { ...w, booths: wardBooths };
+                        });
 
-          return { ...v, wards: villageWards };
-        });
+                    return { ...v, wards: villageWards };
+                });
 
-      return { ...u, villages: unionVillages };
-    });
+            return { ...u, villages: unionVillages };
+        });
 
-    return res.json(tree);
-  } catch (err) {
-    console.error("[partyController] getPartyNetwork error:", err);
-    return res.status(500).json({ message: "Network load failed", error: err.message });
-  }
+        return res.json(tree);
+    } catch (err) {
+        console.error("[partyController] getPartyNetwork error:", err);
+        return res.status(500).json({ message: "Network load failed", error: err.message });
+    }
 };
 
 // ==========================================
 // 2. ADD UNIT (The Save Function)
-// Supports JSON with photoUrl (base64) OR multipart file via multer (req.file)
-// Route: POST /api/party-network/add (or /api/party-network)
+// Route: POST /api/party-network/add
 // ==========================================
 export const addPartyUnit = async (req, res) => {
-  try {
-    // Support both JSON (req.body) and multipart (req.body + req.file)
-    // Preferred frontend keys: nameTa, type, parentId, personName, roleTa, phone, photoUrl
-    const {
-      nameTa,
-      type: rawType,
-      parentId: rawParentId,
-      personName,
-      roleTa,
-      phone,
-      photoUrl // base64 (optional)
-    } = req.body || {};
+    try {
+        const {
+            nameTa,
+            type: rawType,
+            parentId: rawParentId,
+            personName,
+            roleTa,
+            phone,
+            photoUrl 
+        } = req.body || {};
 
-    const type = (rawType || "").toLowerCase();
-    const parentId = rawParentId || null;
+        const type = (rawType || "").toLowerCase();
+        const parentId = rawParentId || null;
 
-    // Basic validation
-    if (!type) {
-      return res.status(400).json({ message: "Missing 'type' field (union/village/ward/booth)" });
-    }
-    if (type !== "union" && !parentId) {
-      return res.status(400).json({ message: `${type} requires a valid parent selection` });
-    }
-    const allowed = ["union", "village", "ward", "booth"];
-    if (!allowed.includes(type)) {
-      return res.status(400).json({ message: `Invalid type: ${type}` });
-    }
-    if (!nameTa || String(nameTa).trim().length < 1) {
-      return res.status(400).json({ message: "Missing or empty 'nameTa' field" });
-    }
+        // Basic validation
+        if (!type || !["union", "village", "ward", "booth"].includes(type)) {
+            return res.status(400).json({ message: "Invalid or missing 'type' field" });
+        }
+        if (type !== "union" && !parentId) {
+            return res.status(400).json({ message: `${type} requires a valid parent selection` });
+        }
+        if (!nameTa || String(nameTa).trim().length < 1) {
+            return res.status(400).json({ message: "Missing or empty 'nameTa' field" });
+        }
 
-    // Decide photo: prefer req.body.photoUrl (base64), else if multer provided file, convert to base64 string
-    let finalPhotoValue = photoUrl || null;
+        // Photo handling (Placeholder for multer/base64)
+        let finalPhotoValue = photoUrl || null;
+        if (!finalPhotoValue && req.file && req.file.buffer) {
+            finalPhotoValue = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        }
 
-    // multer puts the file on req.file when upload.single('photo') is used
-    if (!finalPhotoValue && req.file) {
-      // NOTE: storing base64 in DB is allowed but consider storing file on disk/S3 and saving URL.
-      const buffer = req.file.buffer; // we used memoryStorage
-      if (buffer) {
-        finalPhotoValue = `data:${req.file.mimetype};base64,${buffer.toString("base64")}`;
-      }
-    }
+        // Save to DB
+        const newUnit = await PartyUnit.create({
+            nameTa: String(nameTa).trim(),
+            type,
+            parentId: parentId || null,
+            person: personName || req.body.person || "",
+            roleTa: roleTa || "",
+            phone: phone || "",
+            photo: finalPhotoValue || ""
+        });
 
-    // Save to DB
-    const newUnit = await PartyUnit.create({
-      nameTa: String(nameTa).trim(),
-      type,
-      parentId: parentId || null,
-      person: personName || req.body.person || "",
-      roleTa: roleTa || "",
-      phone: phone || "",
-      photo: finalPhotoValue || ""
-    });
-
-    return res.status(201).json(normalizeNode(newUnit));
-  } catch (err) {
-    console.error("[partyController] Error saving unit:", err);
-    return res.status(500).json({ message: "Failed to add unit", error: err.message });
-  }
+        return res.status(201).json(normalizeNode(newUnit));
+    } catch (err) {
+        console.error("[partyController] Error saving unit:", err);
+        return res.status(500).json({ message: "Failed to add unit", error: err.message });
+    }
 };
 
 // ==========================================
 // 3. DELETE UNIT (deletes item and all descendants)
-// Route: DELETE /api/party-network/:id
 // ==========================================
 export const deletePartyUnit = async (req, res) => {
-  const { id } = req.params;
-  try {
-    if (!id) return res.status(400).json({ message: "Missing id param" });
+    const { id } = req.params;
+    try {
+        if (!id) return res.status(400).json({ message: "Missing id param" });
 
-    // Helper to find all children recursively
-    const findAllChildren = async (parentId) => {
-      const children = await PartyUnit.find({ parentId }).lean();
-      let ids = children.map(c => String(c._id));
-      for (const child of children) {
-        const grandChildren = await findAllChildren(String(child._id));
-        ids = [...ids, ...grandChildren];
-      }
-      return ids;
-    };
+        // Helper to find all children recursively (omitted body for brevity but kept in your code)
+        const findAllChildren = async (parentId) => {
+            const children = await PartyUnit.find({ parentId }).lean();
+            let ids = children.map(c => String(c._id));
+            for (const child of children) {
+                const grandChildren = await findAllChildren(String(child._id));
+                ids = [...ids, ...grandChildren];
+            }
+            return ids;
+        };
 
-    // 1. Find all descendants (Villages/Wards under this Unit)
-    const childrenIds = await findAllChildren(id);
+        const childrenIds = await findAllChildren(id);
+        if (childrenIds.length > 0) {
+            await PartyUnit.deleteMany({ _id: { $in: childrenIds } });
+        }
 
-    // 2. Delete descendants (if any)
-    if (childrenIds.length > 0) {
-      await PartyUnit.deleteMany({ _id: { $in: childrenIds } });
-    }
+        const deleted = await PartyUnit.findByIdAndDelete(id);
 
-    // 3. Delete the item itself
-    const deleted = await PartyUnit.findByIdAndDelete(id);
+        if (!deleted) {
+            return res.status(404).json({ message: "Unit not found" });
+        }
 
-    if (!deleted) {
-      return res.status(404).json({ message: "Unit not found" });
-    }
-
-    return res.json({ message: "Unit and all sub-levels deleted" });
-  } catch (err) {
-    console.error("[partyController] deletePartyUnit error:", err);
-    return res.status(500).json({ message: "Error deleting unit", error: err.message });
-  }
+        return res.json({ message: "Unit and all sub-levels deleted" });
+    } catch (err) {
+        console.error("[partyController] deletePartyUnit error:", err);
+        return res.status(500).json({ message: "Error deleting unit", error: err.message });
+    }
 };
 
 // ==========================================
 // 4. UPDATE UNIT
-// Route: PUT /api/party-network/:id
 // ==========================================
 export const updatePartyUnit = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ message: "Missing id param" });
+    try {
+        const { id } = req.params;
+        if (!id) return res.status(400).json({ message: "Missing id param" });
 
-    // Accept both personName and person; prefer personName from UI
-    const {
-      nameTa,
-      personName,
-      roleTa,
-      phone,
-      photoUrl // base64
-    } = req.body || {};
+        const { nameTa, personName, roleTa, phone, photoUrl } = req.body || {};
 
-    const updateData = {};
-    if (typeof nameTa !== "undefined") updateData.nameTa = nameTa;
-    if (typeof personName !== "undefined") updateData.person = personName;
-    if (typeof req.body.person !== "undefined" && !updateData.person) updateData.person = req.body.person;
-    if (typeof roleTa !== "undefined") updateData.roleTa = roleTa;
-    if (typeof phone !== "undefined") updateData.phone = phone;
+        const updateData = {};
+        if (typeof nameTa !== "undefined") updateData.nameTa = nameTa;
+        if (typeof personName !== "undefined") updateData.person = personName;
+        if (typeof req.body.person !== "undefined" && !updateData.person) updateData.person = req.body.person;
+        if (typeof roleTa !== "undefined") updateData.roleTa = roleTa;
+        if (typeof phone !== "undefined") updateData.phone = phone;
 
-    // If file uploaded via multer
-    if (req.file && req.file.buffer) {
-      updateData.photo = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-    } else if (typeof photoUrl !== "undefined") {
-      updateData.photo = photoUrl;
-    }
+        // Photo Update
+        if (req.file && req.file.buffer) {
+            updateData.photo = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        } else if (typeof photoUrl !== "undefined") {
+            updateData.photo = photoUrl;
+        }
 
-    const updatedUnit = await PartyUnit.findByIdAndUpdate(id, updateData, {
-      new: true,
-      lean: true
-    });
+        const updatedUnit = await PartyUnit.findByIdAndUpdate(id, updateData, {
+            new: true,
+            lean: true
+        });
 
-    if (!updatedUnit) {
-      return res.status(404).json({ message: "Unit not found" });
-    }
+        if (!updatedUnit) {
+            return res.status(404).json({ message: "Unit not found" });
+        }
 
-    return res.json(normalizeNode(updatedUnit));
-  } catch (err) {
-    console.error("[partyController] Update Error:", err);
-    return res.status(500).json({ message: "Failed to update details", error: err.message });
-  }
+        return res.json(normalizeNode(updatedUnit));
+    } catch (err) {
+        console.error("[partyController] Update Error:", err);
+        return res.status(500).json({ message: "Failed to update details", error: err.message });
+    }
 };

@@ -1,28 +1,57 @@
+// models/PartyUnit.js
 import mongoose from "mongoose";
 
-const partyUnitSchema = new mongoose.Schema({
-  // Hierarchy Info
-  nameTa: { type: String, required: true }, // Name of the place (e.g., "Manapparai")
-  type: { 
-    type: String, 
-    enum: ["union", "village", "ward", "booth"], 
-    required: true 
-  },
-  // Parent Link (A Village belongs to a Union ID, etc.)
-  parentId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "PartyUnit", 
-    default: null 
-  },
-  
-  // Person Info (The In-charge)
-  person: { type: String, default: "" },  // Name
-  roleTa: { type: String, default: "" },  // Position (e.g. Secretary)
-  phone: { type: String, default: "" },   // Contact
-  photo: { type: String, default: "" },   // Image URL
+const { Schema, model, Types } = mongoose;
 
-  // Optional: If you really need multiple bearers per unit, use an array
-  // bearers: [{ name: String, role: String, phone: String }] 
-}, { timestamps: true });
+const PartyUnitSchema = new Schema(
+    {
+        // Name of the unit in Tamil (required for validation)
+        nameTa: {
+            type: String,
+            required: [true, 'Unit name is required.'],
+            trim: true,
+        },
+        // Type of the unit (union, village, ward, booth)
+        type: {
+            type: String,
+            enum: ['union', 'village', 'ward', 'booth'],
+            required: [true, 'Unit type is required.'],
+            lowercase: true,
+        },
+        // Reference to the parent unit (null for 'union')
+        parentId: {
+            type: Types.ObjectId,
+            default: null,
+            index: true,
+            // ref: 'PartyUnit' // Optional: If you want to enforce a Mongoose reference
+        },
+        // Person's Name (The office bearer)
+        person: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        // Person's Role (The role of the office bearer in Tamil)
+        roleTa: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        // Contact Phone Number
+        phone: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        // Photo (Stores the Base64 string of the image)
+        photo: {
+            type: String, 
+            default: '',
+        },
+    },
+    { timestamps: true }
+);
 
-export default mongoose.model("PartyUnit", partyUnitSchema);
+const PartyUnit = model('PartyUnit', PartyUnitSchema);
+
+export default PartyUnit;
