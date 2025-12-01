@@ -8,6 +8,7 @@ import newsRoutes from "./routes/newsRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 
+
 dotenv.config();
 
 const app = express();
