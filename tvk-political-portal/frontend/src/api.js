@@ -1,35 +1,36 @@
-// src/api.js (Corrected)
 import axios from "axios";
 
 // Read raw env value (Vite)
 const rawApiUrl = import.meta.env.VITE_API_URL || "";
 
-// Trim trailing slash if present so we never produce double slashes later
-const normalizedEnvUrl = rawApiUrl.replace(/\/+$/, "");
+// ... (keep the rest of the setup logic here) ...
 
 // Fallback to localhost for local development
 export const API_URL = normalizedEnvUrl || "http://localhost:5000";
 console.log("[api] using API_URL:", API_URL);
 
-// Create Axios Instance (This remains the authenticated instance for all other calls)
+// 💡 FIX HERE: Get the secret key from your client's environment variables
+// IMPORTANT: Make sure you have VITE_API_SECRET_KEY set in your frontend's .env file.
+const CLIENT_API_KEY = import.meta.env.VITE_API_SECRET_KEY;
+
+
+// Create Axios Instance
 const API = axios.create({
   baseURL: API_URL,
   withCredentials: false,
+  
+  // 💡 THIS IS THE COPY & PASTE FIX: Add the header globally to all requests
+  headers: {
+    'x-api-key': CLIENT_API_KEY, 
+  }
 });
 
-// ... (keep setAuthToken and readTokenFromLocalStorage functions here) ...
+// ... (keep setAuthToken, readTokenFromLocalStorage, and the interceptor below this) ...
 
-// Request interceptor: (keep the interceptor logic here)
-API.interceptors.request.use((config) => {
-  // ... (keep the existing logic for reading token from localStorage and logging) ...
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
 
-// 💡 FIX HERE: Use base axios and the API_URL to make an UN-AUTHENTICATED request
+// Example health helper (still bypasses the global API instance)
 export const getHealth = async () => {
-  // Call the root URL '/' for an unauthenticated health check, bypassing the 'API' instance
+  // This uses base axios, so it bypasses the security check. Good!
   const res = await axios.get(`${API_URL}/`);
   return res.data;
 };
