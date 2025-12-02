@@ -1,4 +1,4 @@
-// server.js
+// server.js (Corrected)
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -11,19 +11,22 @@ import eventRoutes from "./routes/eventRoutes.js";
 
 // new middleware imports
 import requestLogger from "./middleware/requestLogger.js"; // debug logger
-// do NOT import checkApiKey here (it's used by routes) to avoid circular imports
+import checkAuth from "./middleware/checkAuth.js"; // 💡 NEW: Import the security middleware
 
 dotenv.config();
 
 const app = express();
 
-// --- CORS ---
+// --- Basic health route (MUST be placed before any global middleware) ---
+// This handles the request from App.jsx's getHealth() which calls the root URL.
+app.get("/", (req, res) => {
+  res.send("TVK Political Portal API running");
+});
+// -----------------------------------------------------------------------
+
+// --- CORS --- (Keep this section as is)
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "https://tvk-web.vercel.app",
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "x-api-key"],
-  credentials: true,
-  optionsSuccessStatus: 204,
+// ... (your existing corsOptions) ...
 };
 
 // handle preflight for all routes
@@ -34,52 +37,27 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// --- DEBUG request logger (short-term; safe to keep while debugging) ---
-// Log basic headers and parsed body so you can see what arrives on Render
+// --- DEBUG request logger ---
 app.use(requestLogger);
 
-// --- Register all routes (Base paths) ---
-app.use("/api/auth", authRoutes);
+// 💡 CRITICAL FIX: Place the security middleware BEFORE all API routes
+// The checkAuth middleware will now exempt the '/' route we defined above.
+app.use(checkAuth); 
+
+// --- Register all API routes (Base paths) ---
+app.use("/api/auth", authRoutes); // Auth routes should handle their own internal token logic
 app.use("/api/news", newsRoutes);
 app.use("/api/party-network", partyRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/admin", adminProxy);
 
-// --- Basic health routes ---
-app.get("/", (req, res) => {
-  res.send("TVK Political Portal API running");
-});
-
 // --- Start server after DB connected ---
 const startServer = async () => {
-  try {
-    await connectDB(); // wait for DB connection before starting server
-    console.log("✅ Database connected, starting HTTP server...");
-
-    const PORT = process.env.PORT || 5000;
-    const server = app.listen(PORT, () =>
-      console.log(`Server running on port ${PORT}`)
-    );
-
-    // Graceful shutdown on SIGINT/SIGTERM
-    const shutdown = async (signal) => {
-      console.log(`\nReceived ${signal}. Closing server...`);
-      server.close(() => {
-        console.log("HTTP server closed.");
-        process.exit(0);
-      });
-    };
-    process.on("SIGINT", () => shutdown("SIGINT"));
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-
-  } catch (err) {
-    console.error("Failed to start server — DB connection error:", err);
-    process.exit(1);
-  }
+// ... (your existing server start and shutdown logic) ...
 };
 
 startServer();
 
 process.on("unhandledRejection", (reason, p) => {
-  console.error("Unhandled Rejection at Promise:", p, "reason:", reason);
+  console.error("Unhandled Rejection at Promise:", p, "reason:", reason);
 });
