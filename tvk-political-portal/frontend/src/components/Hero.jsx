@@ -84,8 +84,8 @@ export default function Hero() {
               <div key={admin.id} className="hero-admin-card small-card">
                 <div className="hero-photo-wrapper small-wrapper">
                   <img
-                    src={admin.imgSrc}
-                    alt={admin.name}
+                    src={"/anand.avif"}
+                    alt={"Mr.Anand"}
                     className="hero-photo small-photo"
                   />
                    {/* Optional: thinner border for small cards */}
