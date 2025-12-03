@@ -7,13 +7,13 @@ import React from 'react';
 const admins = [
   {
     id: 1,
-    name: "திரு. நிர்வாகி 1",
+    name: "திரு.ஆனந்த் ",
     role: "கட்சி செயலாளர்",
-    imgSrc: "/admin-placeholder-1.jpg", // Replace with actual image path
+    imgSrc: "\assets\admins\anand.avif", // Replace with actual image path
   },
   {
     id: 2,
-    name: "திரு. நிர்வாகி 2",
+    name: "திரு.ரவிசங்கர்",
     role: "மாவட்ட செயலாளர்",
     imgSrc: "/admin-placeholder-2.jpg", // Replace with actual image path
   },
@@ -84,8 +84,8 @@ export default function Hero() {
               <div key={admin.id} className="hero-admin-card small-card">
                 <div className="hero-photo-wrapper small-wrapper">
                   <img
-                    src={"/anand.avif"}
-                    alt={"Mr.Anand"}
+                    src={admin.imgSrc}
+                    alt={admin.name}
                     className="hero-photo small-photo"
                   />
                    {/* Optional: thinner border for small cards */}
